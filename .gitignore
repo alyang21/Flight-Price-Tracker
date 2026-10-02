@@ -219,6 +219,5 @@ __marimo__/
 .streamlit/secrets.toml
 
 # Project-specific: collected data and trained models shouldn't be committed
-data/
 *.pt
 *.pth

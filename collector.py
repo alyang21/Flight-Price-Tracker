@@ -18,24 +18,31 @@ from pathlib import Path
 import requests
 from dotenv import load_dotenv
 
-load_dotenv()  # reads variables from the .env file into the environment
+# Anchor every path to this file's folder, so the script works no matter
+# which directory it's launched from (Task Scheduler, cron, Docker, etc.).
+BASE_DIR = Path(__file__).resolve().parent
+
+load_dotenv(BASE_DIR / ".env")  # reads variables from the .env file into the environment
 API_TOKEN = os.getenv("TRAVELPAYOUTS_TOKEN")
 
 API_URL = "https://api.travelpayouts.com/aviasales/v3/prices_for_dates"
 
-# (origin, destination) pairs. City codes like CHI and NYC cover all of that city's airports (e.g. NYC = JFK + LGA + EWR).
-ROUTES = [
-    ("STL", "CHI"),
-    ("STL", "NYC"),
-    ("STL", "LAX"),
-    ("STL", "DEN"),
-    ("CHI", "NYC"),
-    ("NYC", "LAX"),
+# Airport pairs to track. Each pair is collected in BOTH directions.
+ROUTE_PAIRS = [
+    ("NYC", "TPE"),  # Any New York <-> Taipei Taoyuan
+    ("NYC", "STL"),  # Any New York <-> St. Louis
+    ("NYC", "YVR"),  # Any New York <-> Vancouver
+    ("NYC", "PVG"),  # Any New York <-> Shanghai Pudong
+    ("NYC", "KEF"),  # Any New York <-> Reykjavik Keflavik
+    ("NYC", "LAX"),  # Any New York <-> Los Angeles
 ]
-MONTHS_AHEAD = 4  # how many months of departure dates to track
+# Expand each pair into two one-way routes: (A, B) and (B, A).
+ROUTES = [route for a, b in ROUTE_PAIRS for route in ((a, b), (b, a))]
+
+MONTHS_AHEAD = 12  # how many months of departure dates to track
 CURRENCY = "usd"
 
-DATA_DIR = Path("data")
+DATA_DIR = BASE_DIR / "data"
 RAW_DIR = DATA_DIR / "raw"
 PROCESSED_DIR = DATA_DIR / "processed"
 
@@ -212,6 +219,10 @@ def main() -> None:
             route_count += len(rows)
         summary[route_key] = route_count
 
+    if not all_rows:
+        log.error("Collected 0 rows across all routes; not saving. Check token and API status.")
+        raise SystemExit(1)
+    
     raw_path = save_raw(raw_responses, observed_date)
     csv_path = save_processed(all_rows, observed_date)
 

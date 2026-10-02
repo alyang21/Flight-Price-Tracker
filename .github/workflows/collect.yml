@@ -1,0 +1,47 @@
+name: Collect flight prices
+
+on:
+  schedule:
+    - cron: "21 0 * * *"   # daily at 00:21 UTC = 7:21 PM Central (daylight time)
+  workflow_dispatch:        # adds a "Run workflow" button for manual runs
+
+permissions:
+  contents: write           # lets the job push the new data back to the repo
+
+concurrency:
+  group: collector          # never run two collections at the same time
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install collector dependencies
+        run: pip install requests python-dotenv
+
+      - name: Run collector
+        env:
+          TRAVELPAYOUTS_TOKEN: ${{ secrets.TRAVELPAYOUTS_TOKEN }}
+        run: python collector.py
+
+      - name: Commit new data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/
+          if git diff --staged --quiet; then
+            echo "No new data to commit."
+          else
+            git commit -m "Data: daily snapshot $(date -u +%Y-%m-%d)"
+            git push
+          fi
