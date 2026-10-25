@@ -13,7 +13,9 @@ import torch
 from torch import nn
 
 from baseline import evaluate, predict_days_rule
-from dataset import CURRENT_ROUTES, build_dataset, time_split
+from dataset import (
+    CURRENT_ROUTES, build_dataset, cheapest_series, load_snapshots, time_split,
+)
 
 BASE_DIR = Path(__file__).resolve().parent
 MODEL_PATH = BASE_DIR / "models" / "price_direction.pt"
@@ -31,7 +33,7 @@ LEARNING_RATE = 1e-3
 WEIGHT_DECAY = 1e-3  # penalizes large weights, which discourages overfitting
 
 # Experiment switch: include route and day-of-week one-hot inputs or not.
-USE_ROUTE_AND_DOW = False
+USE_ROUTE_AND_DOW = False  # False won the ablation on current data
 
 
 # ── Section 1: Turn dataframe rows into numeric feature matrices ─────────────
@@ -116,6 +118,11 @@ def predict(model: PriceDirectionNet, X: np.ndarray) -> np.ndarray:
     return (logits > 0).int().numpy()
 
 
+def route_medians() -> dict:
+    """Median cheapest price per route, computed the same way as dataset.py."""
+    return cheapest_series(load_snapshots()).groupby("route").price.median().to_dict()
+
+
 # ── Section 4: Run, compare to baseline, save ────────────────────────────────
 def main() -> None:
     data = add_derived_features(build_dataset())
@@ -155,6 +162,10 @@ def main() -> None:
             "scaler": scaler,
             "routes": CURRENT_ROUTES,
             "numeric_features": NUMERIC_FEATURES,
+            "use_route_and_dow": USE_ROUTE_AND_DOW,
+            # Typical cheapest price per route, needed to compute
+            # price_vs_route_median for new requests in the API.
+            "route_medians": route_medians(),
         },
         MODEL_PATH,
     )
