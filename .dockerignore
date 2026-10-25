@@ -1,0 +1,16 @@
+# Never send secrets into an image
+.env
+
+# Data and models are mounted or produced at run time, not baked in
+data/
+docker-test-data/
+models/
+
+# Local clutter
+.git/
+logs/
+__pycache__/
+venv/
+.venv/
+*.pyc
+project_bundle.txt
